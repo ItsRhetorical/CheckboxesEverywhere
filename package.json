@@ -1,0 +1,12 @@
+{
+  "name": "checkbox-plugin",
+  "version": "0.0.1",
+  "description": "A sample Obsidian plugin scaffolded by Copilot.",
+  "main": "main.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^5.0.0"
+  }
+}
