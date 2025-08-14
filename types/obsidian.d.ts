@@ -27,9 +27,24 @@ declare module 'obsidian' {
   export class Workspace {
     getActiveViewOfType<T>(type: any): T | null;
     getActiveViewOfType(type: typeof MarkdownView): MarkdownView | null;
+    activeLeaf: WorkspaceLeaf | null;
     on(event: string, callback: () => void): any;
   }
-  export class TFile {}
+  export class TFile {
+    path: string;
+    name: string;
+  }
+  export class WorkspaceLeaf {
+    getViewState(): ViewState;
+    view: MarkdownView;
+  }
+  export interface ViewState {
+    type: string;
+    state?: {
+      mode?: string;
+      source?: boolean;
+    };
+  }
   export class MarkdownView {
     previewMode: { rerender(force: boolean): void };
     getMode(): string; // Returns 'source' or 'preview' or 'live'

@@ -1,183 +1,185 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const obsidian_1 = require("obsidian");
-/** Matches inline checkboxes with space: [ ] or [x]/[X]
- *  - Must have exactly one space or x/X inside brackets
- *  - Left boundary: start or whitespace or '>' (for blockquotes)
- *  - Not immediately followed b        input.dataset["secStart"] = String(sec.lineStart);
-        input.dataset["matchText"] = m[0]; // "[ ]"    if (foundLine === -1) {
-      // Couldn't resolve exact position; revert the visual state
-      target.checked = !newCheckedState;
-      return;
-    }
-
-    const current = lines[foundLine].slice(foundCh, foundCh + 3);
-    const next = newCheckedState ? "[x]" : "[ ]"; // Match the visual state
-    lines[foundLine] = lines[foundLine].slice(0, foundCh) + next + lines[foundLine].slice(foundCh + 3);
-        input.dataset["nodeTextBefore"] = text.slice(0, m.index).slice(-50); // last 50 chars before
-        input.dataset["nodeTextAfter"]  = text.slice(m.index + m[0].length, m.index + m[0].length + 50); // next 50
-        input.dataset["absolutePosition"] = String(m.index); // Store absolute position for better matching'     if (foundLine === -1) {
-      //     if (foundLine === -1) {
-      // Couldn't resolve exact position; keep the visual state as user clicked
-      console.log("Could not find checkbox position in file");
-      return;
-    }
-
-    const current = lines[foundLine].slice(foundCh, foundCh + 3);
-    const next = newCheckedState ? "[x]" : "[ ]"; // Use the visual state user clicked to
-    lines[foundLine] = lines[foundLine].slice(0, foundCh) + next + lines[foundLine].slice(foundCh + 3);
-
-    await this.app.vault.modify(file, lines.join("\n"));
-
-    // Update the dataset to reflect new state
-    target.dataset["originalState"] = newCheckedState ? "checked" : "unchecked";
-    target.dataset["matchText"] = next;
-    
-    console.log(`File updated successfully, checkbox should be: ${newCheckedState}`);
-    
-    // Ensure the visual state matches what we intended
-    setTimeout(() => {
-      target.checked = newCheckedState;
-      console.log(`Visual state set to: ${target.checked}`);
-    }, 50);
-
-    } catch (error) {
-      console.error("Error updating checkbox:", error);
-      // Revert visual state on error
-      target.checked = !newCheckedState;
-    }
-
-    // Don't trigger rerender in reading mode as it will reset the visual state
-    // The file update is sufficient for persistence
-  }
-}act position; keep the visual state as user clicked
-      return;
-    }
-
-    const current = lines[foundLine].slice(foundCh, foundCh + 3);
-    const next = newCheckedState ? "[x]" : "[ ]"; // Use the visual state user clicked to
-    lines[foundLine] = lines[foundLine].slice(0, foundCh) + next + lines[foundLine].slice(foundCh + 3);
-
-    await this.app.vault.modify(file, lines.join("\n"));
-
-    // Update the dataset to reflect new state
-    target.dataset["originalState"] = newCheckedState ? "checked" : "unchecked";
-    target.dataset["matchText"] = next;
-
-    // Don't trigger rerender in reading mode as it will reset the visual state
-    // The file update is sufficient for persistence
-    // Trigger a rerender so other instances stay in sync
-    // const view = this.app.workspace.getActiveViewOfType(MarkdownView) as MarkdownView | null;
-    // view?.previewMode.rerender(true);
-  }k) collisions
- *  - Right boundary: end or whitespace/punctuation
- *  - This will match "asdf[ ]" and convert just the [ ] part
- */
-const INLINE_CB = /\[ \]|\[[xX]\]/g;
-class InlineCheckboxPlugin extends obsidian_1.Plugin {
+class InteractiveCheckboxPlugin extends obsidian_1.Plugin {
     constructor() {
         super(...arguments);
-        this.isUpdating = false; // Flag to prevent re-rendering during updates
-        this.lastSourceMode = undefined; // Track mode changes
-        this.mutationObserver = null;
+        this.livePreviewExtensions = [];
     }
     async onload() {
-        this.registerMarkdownPostProcessor((el, ctx) => this.process(el, ctx));
-        this.registerDomEvent(document, "click", (evt) => this.onClick(evt));
+        console.log('Loading Interactive Checkbox Plugin');
+        // Create the checkbox processor function for reading mode
+        // this.checkboxProcessor = (element: HTMLElement, context: MarkdownPostProcessorContext) => {
+        // 	this.processReadingMode(element, context);
+        // };
+        // Register markdown post-processor for reading mode
+        // this.registerMarkdownPostProcessor(this.checkboxProcessor);
+        // Set up CodeMirror extensions for live preview mode
+        this.setupLivePreviewMode();
+        // Add CSS styles
         this.addStyles();
-        // Add CodeMirror extension for edit mode checkboxes
-        // @ts-ignore
-        if (this.app.workspace?.on) {
-            // Obsidian v0.13+ CodeMirror 6
-            // @ts-ignore
-            this.registerEditorExtension(this.inlineCheckboxCM6());
-            // Start observing for mode changes
-            this.startModeObserver();
-        }
-        else {
-            // Obsidian v0.12 CodeMirror 5
-            // @ts-ignore
-            this.registerCodeMirror((cm) => {
-                cm.on("renderLine", (cm, line, elt) => {
-                    // Not implemented: CM5 support (Obsidian 0.12 is legacy)
-                });
-            });
-        }
     }
     onunload() {
-        if (this.mutationObserver) {
-            this.mutationObserver.disconnect();
-            this.mutationObserver = null;
-        }
+        console.log('Unloading Interactive Checkbox Plugin');
     }
-    startModeObserver() {
-        // Observe changes to the workspace that might indicate mode switches
-        this.mutationObserver = new MutationObserver((mutations) => {
-            for (const mutation of mutations) {
-                // Check if any class changes might indicate a mode switch
-                if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
-                    this.checkModeChange();
+    processReadingMode(element, context) {
+        // Find all text nodes that contain checkbox patterns
+        const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, {
+            acceptNode: (node) => {
+                const text = node.textContent || '';
+                // Look for checkbox patterns not already processed
+                if (/\[[ xX]\]/.test(text) && !this.isInCodeBlock(node) && !this.isInLink(node)) {
+                    return NodeFilter.FILTER_ACCEPT;
                 }
-                // Also check for child list changes that might affect the editor
-                else if (mutation.type === 'childList' && mutation.target) {
-                    const target = mutation.target;
-                    if (target.classList?.contains('workspace-leaf') ||
-                        target.closest('.workspace-leaf')) {
-                        this.checkModeChange();
-                    }
-                }
+                return NodeFilter.FILTER_REJECT;
             }
         });
-        // Observe the workspace for changes
-        const workspace = document.querySelector('.workspace');
-        if (workspace) {
-            this.mutationObserver.observe(workspace, {
-                attributes: true,
-                attributeFilter: ['class', 'data-mode'],
-                childList: true,
-                subtree: true
+        const textNodes = [];
+        let node;
+        while (node = walker.nextNode()) {
+            textNodes.push(node);
+        }
+        // Process each text node containing checkboxes
+        textNodes.forEach(textNode => {
+            this.processTextNodeCheckboxes(textNode, context);
+        });
+    }
+    processTextNodeCheckboxes(textNode, context) {
+        const text = textNode.textContent || '';
+        const checkboxRegex = /\[[ xX]\]/g;
+        let match;
+        const replacements = [];
+        // Find all checkbox patterns in this text node
+        while ((match = checkboxRegex.exec(text))) {
+            const index = match.index;
+            const pattern = match[0];
+            const isChecked = /[xX]/.test(pattern);
+            // Check if this is followed by ( to avoid link syntax like [x](url)
+            const nextChar = text[index + pattern.length];
+            if (nextChar === '(') {
+                continue;
+            }
+            replacements.push({
+                index,
+                length: pattern.length,
+                isChecked
             });
         }
+        // Process replacements in reverse order to maintain indices
+        replacements.reverse().forEach(replacement => {
+            this.replaceCheckboxInTextNode(textNode, replacement, context);
+        });
     }
-    checkModeChange() {
-        // Debounce the check to avoid excessive calls
-        setTimeout(() => {
-            const activeView = this.app.workspace.getActiveViewOfType(obsidian_1.MarkdownView);
-            if (activeView && activeView.currentMode) {
-                const currentSourceMode = activeView.currentMode.sourceMode;
-                if (currentSourceMode !== this.lastSourceMode) {
-                    console.log(`Mode changed from ${this.lastSourceMode} to ${currentSourceMode}`);
-                    this.lastSourceMode = currentSourceMode;
-                    this.triggerEditorUpdate();
+    replaceCheckboxInTextNode(textNode, replacement, context) {
+        const { index, length, isChecked } = replacement;
+        // Create the checkbox element
+        const checkbox = document.createElement('input');
+        checkbox.type = 'checkbox';
+        checkbox.checked = isChecked;
+        checkbox.className = 'inline-cb';
+        // Add click handler
+        checkbox.addEventListener('click', (e) => {
+            e.preventDefault();
+            this.handleCheckboxToggle(checkbox, context);
+        });
+        // Split the text node and insert the checkbox
+        const beforeText = textNode.textContent?.substring(0, index) || '';
+        const afterText = textNode.textContent?.substring(index + length) || '';
+        // Create new text nodes
+        const beforeNode = document.createTextNode(beforeText);
+        const afterNode = document.createTextNode(afterText);
+        // Insert the new nodes
+        textNode.parentNode?.insertBefore(beforeNode, textNode);
+        textNode.parentNode?.insertBefore(checkbox, textNode);
+        textNode.parentNode?.insertBefore(afterNode, textNode);
+        // Remove the original text node
+        textNode.parentNode?.removeChild(textNode);
+    }
+    async handleCheckboxToggle(checkbox, context) {
+        const newState = checkbox.checked;
+        const file = this.app.vault.getAbstractFileByPath(context.sourcePath);
+        if (!file || file.path !== context.sourcePath) {
+            console.warn('File not found for checkbox toggle');
+            return;
+        }
+        try {
+            const content = await this.app.vault.read(file);
+            const lines = content.split('\n');
+            // Find and update the checkbox in the file content
+            const sectionInfo = context.getSectionInfo(checkbox);
+            if (sectionInfo) {
+                const lineIndex = sectionInfo.lineStart;
+                if (lineIndex < lines.length) {
+                    const line = lines[lineIndex];
+                    const newPattern = newState ? '[x]' : '[ ]';
+                    const updatedLine = line.replace(/\[[ xX]\]/, newPattern);
+                    lines[lineIndex] = updatedLine;
+                    const newContent = lines.join('\n');
+                    await this.app.vault.modify(file, newContent);
                 }
             }
-        }, 50); // Small delay to ensure DOM is stable
-    }
-    triggerEditorUpdate() {
-        // Force CodeMirror to update decorations by triggering a state update
-        const activeView = this.app.workspace.getActiveViewOfType(obsidian_1.MarkdownView);
-        if (activeView && activeView.editor) {
-            const editor = activeView.editor;
-            if (editor.cm && editor.cm.dispatch) {
-                // Trigger a minimal state update to refresh decorations
-                setTimeout(() => {
-                    editor.cm.dispatch({ effects: [] });
-                }, 10);
-            }
+        }
+        catch (error) {
+            console.error('Error updating checkbox state:', error);
+            // Revert checkbox state on error
+            checkbox.checked = !newState;
         }
     }
-    // CodeMirror 6 extension for inline checkboxes in edit mode
-    inlineCheckboxCM6() {
-        // Access CodeMirror classes through the global require function in Obsidian
+    isInCodeBlock(node) {
+        let current = node.parentElement;
+        while (current) {
+            if (current.tagName === 'CODE' ||
+                current.tagName === 'PRE' ||
+                current.classList.contains('cm-inline-code') ||
+                current.classList.contains('HyperMD-codeblock')) {
+                return true;
+            }
+            current = current.parentElement;
+        }
+        return false;
+    }
+    isInLink(node) {
+        let parent = node.parentElement;
+        while (parent) {
+            if (parent.tagName === 'A') {
+                return true;
+            }
+            parent = parent.parentElement;
+        }
+        return false;
+    }
+    detectCurrentMode() {
+        const activeLeaf = this.app.workspace.activeLeaf;
+        if (!activeLeaf)
+            return null;
+        const viewState = activeLeaf.getViewState();
+        if (!viewState || viewState.type !== 'markdown')
+            return null;
+        // Check the view state for mode information according to API docs
+        if (viewState.state?.mode === 'preview') {
+            return 'reading';
+        }
+        else if (viewState.state?.source == false) {
+            return 'live-preview';
+        }
+        else if (viewState.state?.source) {
+            return 'source';
+        }
+        return null;
+    }
+    setupLivePreviewMode() {
         try {
-            // @ts-ignore
+            // @ts-ignore - Access CodeMirror classes through Obsidian's require
             const { EditorView, Decoration, WidgetType } = require('@codemirror/view');
             // @ts-ignore
             const { StateField, RangeSetBuilder } = require('@codemirror/state');
-            if (!Decoration || !WidgetType || !RangeSetBuilder || !EditorView || !StateField) {
+            // @ts-ignore
+            const { syntaxTree } = require('@codemirror/language');
+            if (!Decoration || !WidgetType || !RangeSetBuilder || !StateField) {
                 console.warn("CodeMirror APIs not fully available.");
-                return [];
+                return;
             }
+            // Define the widget class
             class CheckboxWidget extends WidgetType {
                 constructor(checked, from, to) {
                     super();
@@ -192,97 +194,86 @@ class InlineCheckboxPlugin extends obsidian_1.Plugin {
                     box.checked = this.checked;
                     box.addEventListener("mousedown", (e) => e.preventDefault());
                     box.addEventListener("click", (e) => {
-                        // Toggle the markdown text
+                        e.preventDefault();
+                        const newText = this.checked ? "[ ]" : "[x]";
                         const tr = view.state.update({
-                            changes: { from: this.from, to: this.to, insert: this.checked ? "[ ]" : "[x]" }
+                            changes: { from: this.from, to: this.to, insert: newText }
                         });
                         view.dispatch(tr);
                     });
                     return box;
                 }
-                // Override to handle cursor positioning
-                ignoreEvent() { return false; }
-                // Make the widget act as a single character for cursor movement
-                coordsAt(dom, pos, side) {
+                ignoreEvent() {
+                    return false;
+                }
+                coordsAt(dom) {
                     return dom.getBoundingClientRect();
                 }
             }
             const plugin = this;
-            return StateField.define({
+            let lastMode = this.detectCurrentMode();
+            const checkboxField = StateField.define({
                 create(state) {
-                    return plugin.createCheckboxDecorations(state, null);
+                    const currentMode = plugin.detectCurrentMode();
+                    if (currentMode === 'live-preview') {
+                        return plugin.createCheckboxDecorations(state, null, CheckboxWidget, Decoration, RangeSetBuilder, syntaxTree);
+                    }
+                    return new RangeSetBuilder().finish();
                 },
                 update(deco, tr) {
-                    if (tr.docChanged || tr.selection) {
-                        return plugin.createCheckboxDecorations(tr.state, tr.selection);
+                    const currentMode = plugin.detectCurrentMode();
+                    // If mode changed from live-preview to something else, clear decorations
+                    if (lastMode === 'live-preview' && currentMode !== 'live-preview') {
+                        lastMode = currentMode;
+                        return new RangeSetBuilder().finish();
                     }
+                    // If mode changed to live-preview, create decorations
+                    if (lastMode !== 'live-preview' && currentMode === 'live-preview') {
+                        lastMode = currentMode;
+                        return plugin.createCheckboxDecorations(tr.state, tr.selection, CheckboxWidget, Decoration, RangeSetBuilder, syntaxTree);
+                    }
+                    // Normal updates when in live-preview mode
+                    if (currentMode === 'live-preview' && (tr.docChanged || tr.selection)) {
+                        return plugin.createCheckboxDecorations(tr.state, tr.selection, CheckboxWidget, Decoration, RangeSetBuilder, syntaxTree);
+                    }
+                    lastMode = currentMode;
                     return deco.map(tr.changes);
                 },
                 provide: (f) => EditorView.decorations.from(f)
             });
+            // Register the extension with CodeMirror via the registerEditorExtension method
+            // @ts-ignore - This method exists but may not be in all type definitions
+            this.registerEditorExtension([checkboxField]);
+            this.livePreviewExtensions = [checkboxField];
         }
         catch (error) {
             console.warn("CodeMirror 6 APIs not available in this Obsidian version:", error);
-            return [];
         }
     }
-    createCheckboxDecorations(state, selection) {
+    createCheckboxDecorations(state, selection, CheckboxWidget, Decoration, RangeSetBuilder, syntaxTree) {
         try {
-            // @ts-ignore
-            const { EditorView, Decoration, WidgetType } = require('@codemirror/view');
-            // @ts-ignore
-            const { StateField, RangeSetBuilder } = require('@codemirror/state');
-            // Check if we're in source mode using Obsidian's API
-            // Use currentMode.sourceMode to detect the actual view mode state
-            const activeView = this.app.workspace.getActiveViewOfType(obsidian_1.MarkdownView);
-            if (activeView && activeView.currentMode) {
-                const currentMode = activeView.currentMode;
-                const sourceMode = currentMode.sourceMode;
-                console.log(`currentMode.sourceMode: ${sourceMode}`);
-                if (sourceMode === true) {
-                    console.log("Source editing mode detected, skipping checkbox decorations");
-                    return new RangeSetBuilder().finish();
-                }
-                else if (sourceMode === false) {
-                    console.log("Live preview editing mode detected, applying checkbox decorations");
-                }
-                else {
-                    console.log("Reading mode detected (sourceMode undefined), applying checkbox decorations");
-                }
-            }
-            else {
-                console.log("Could not access currentMode, applying decorations");
-            }
             const builder = new RangeSetBuilder();
             const text = state.doc.toString();
-            const re = INLINE_CB;
+            const re = /\[[ xX]\]/g;
             let match;
-            re.lastIndex = 0;
             // Get cursor position if available
             const cursorPos = selection ? selection.main.head : -1;
-            class CheckboxWidget extends WidgetType {
-                constructor(checked, from, to) {
-                    super();
-                    this.checked = checked;
-                    this.from = from;
-                    this.to = to;
-                }
-                toDOM(view) {
-                    const box = document.createElement("input");
-                    box.type = "checkbox";
-                    box.className = "inline-cb cm-inline-cb";
-                    box.checked = this.checked;
-                    box.addEventListener("mousedown", (e) => e.preventDefault());
-                    box.addEventListener("click", (e) => {
-                        // Toggle the markdown text
-                        const tr = view.state.update({
-                            changes: { from: this.from, to: this.to, insert: this.checked ? "[ ]" : "[x]" }
-                        });
-                        view.dispatch(tr);
-                    });
-                    return box;
-                }
-            }
+            // Get syntax tree for the current state
+            const tree = syntaxTree(state);
+            // Helper function to check if a position is inside a code block
+            const isInCodeBlock = (pos) => {
+                let isInCode = false;
+                tree.iterate({
+                    from: pos,
+                    to: pos,
+                    enter: (node) => {
+                        if (node.type.name === "inline-code" || node.type.name?.includes("codeblock")) {
+                            isInCode = true;
+                        }
+                    }
+                });
+                return isInCode;
+            };
             while ((match = re.exec(text))) {
                 const from = match.index;
                 const to = from + match[0].length;
@@ -292,13 +283,12 @@ class InlineCheckboxPlugin extends obsidian_1.Plugin {
                 if (nextChar === '(') {
                     continue;
                 }
-                // Skip if inside code blocks or links
-                const beforeText = text.substring(Math.max(0, from - 10), from);
-                if (beforeText.includes('`') || beforeText.includes('](')) {
-                    continue;
-                }
                 // Skip conversion if cursor is inside or immediately after this checkbox pattern
                 if (cursorPos >= from && cursorPos <= to + 1) {
+                    continue;
+                }
+                // Skip if the checkbox is inside a code block
+                if (isInCodeBlock(from)) {
                     continue;
                 }
                 console.log(`Adding checkbox decoration: "${match[0]}" at ${from}-${to}`);
@@ -314,209 +304,22 @@ class InlineCheckboxPlugin extends obsidian_1.Plugin {
         }
     }
     addStyles() {
-        const style = document.createElement("style");
+        // Add CSS for checkbox styling
+        const style = document.createElement('style');
         style.textContent = `
-      .inline-cb {
-        width: 1em;
-        height: 1em;
-        vertical-align: text-bottom;
-        margin: 0 .1em;
-        display: inline-block;
-        flex-shrink: 0;
-        box-sizing: border-box;
-        padding: 0;
-        border: 1px solid #ccc;
-      }
-      .cm-inline-cb {
-        width: 1em;
-        height: 1em;
-        vertical-align: text-bottom;
-        margin: 0 .1em;
-        display: inline-block;
-        flex-shrink: 0;
-        position: relative;
-        z-index: 1;
-        box-sizing: border-box;
-        padding: 0;
-        border: 1px solid #ccc;
-      }
-    `;
+			.inline-cb {
+				cursor: pointer;
+				margin: 0 2px;
+				vertical-align: middle;
+			}
+			
+			.cm-inline-cb {
+				cursor: pointer;
+				margin: 0 2px;
+				vertical-align: middle;
+			}
+		`;
         document.head.appendChild(style);
     }
-    process(root, ctx) {
-        // Skip processing if we're currently updating to prevent re-creation
-        if (this.isUpdating) {
-            console.log("Skipping processing - currently updating");
-            return;
-        }
-        // Skip if we don't know the source file
-        const sourcePath = ctx.sourcePath;
-        if (!sourcePath)
-            return;
-        // Walk text nodes; avoid code, pre, a, and list task items ("- [ ]")
-        const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-        let node;
-        while ((node = walker.nextNode())) {
-            const parent = node.parentElement;
-            if (!parent)
-                continue;
-            const tag = parent.tagName;
-            if (tag === "CODE" || tag === "PRE" || tag === "A")
-                continue;
-            // Don't interfere with normal task lists "- [ ]"
-            if (parent.closest("li")?.textContent?.trim().startsWith("[") && parent.closest("ul,ol"))
-                continue;
-            const text = node.data;
-            if (!text || !INLINE_CB.test(text)) {
-                INLINE_CB.lastIndex = 0; // reset sticky state
-                continue;
-            }
-            INLINE_CB.lastIndex = 0;
-            // Build a fragment replacing each token with an input
-            const frag = document.createDocumentFragment();
-            let lastIdx = 0;
-            let m;
-            while ((m = INLINE_CB.exec(text))) {
-                const before = text.slice(lastIdx, m.index);
-                if (before)
-                    frag.appendChild(document.createTextNode(before));
-                const isChecked = /[xX]/.test(m[0]);
-                const input = document.createElement("input");
-                input.type = "checkbox";
-                input.className = "inline-cb";
-                // Data needed to update the file:
-                // - sourcePath (file)
-                // - section start line (via ctx.getSectionInfo)
-                // - lineOffset (which line inside the section)
-                // - ch (column of '[' within that line)
-                const sec = ctx.getSectionInfo(root); // section of this rendered block
-                if (!sec) {
-                    // Fallback: we can still render but won’t allow toggling
-                    input.disabled = true;
-                }
-                else {
-                    // Compute line/ch for this match within section text
-                    // Section text is the exact markdown that produced `root`.
-                    const sectionText = sec.text;
-                    // Recompute position safely by mapping node’s text to section text.
-                    // Approach: find local line breaks up to this node’s textContent position.
-                    // To keep things robust without DOM-to-source maps, we derive positions within the node only
-                    // and store an offset token we’ll resolve later by searching around the section bounds.
-                    input.dataset["file"] = ctx.sourcePath;
-                    input.dataset["secStart"] = String(sec.lineStart);
-                    input.dataset["matchText"] = m[0]; // "[ ]" or "[x]"
-                    input.dataset["nodeTextBefore"] = text.slice(0, m.index).slice(-50); // last 50 chars before
-                    input.dataset["nodeTextAfter"] = text.slice(m.index + m[0].length, m.index + m[0].length + 50); // next 50
-                }
-                input.checked = isChecked;
-                // Store original state for comparison
-                input.dataset["originalState"] = isChecked ? "checked" : "unchecked";
-                input.dataset["markdownText"] = m[0]; // Store the original markdown text
-                input.dataset["mode"] = "reading"; // Mark as reading mode checkbox
-                console.log(`Creating checkbox: markdown="${m[0]}", isChecked=${isChecked}, visual=${input.checked}`);
-                // Add click handler for reading mode
-                input.addEventListener("click", async (e) => {
-                    e.stopPropagation(); // Prevent event bubbling
-                    const checkbox = e.target;
-                    const newState = checkbox.checked;
-                    const originalMarkdown = checkbox.dataset["markdownText"];
-                    console.log(`Checkbox clicked, markdown was: "${originalMarkdown}", new visual state: ${newState}`);
-                    // Store the intended state before processing
-                    checkbox.dataset["pendingState"] = newState ? "checked" : "unchecked";
-                });
-                frag.appendChild(input);
-                lastIdx = m.index + m[0].length;
-            }
-            const tail = text.slice(lastIdx);
-            if (tail)
-                frag.appendChild(document.createTextNode(tail));
-            // Replace the original text node
-            parent.replaceChild(frag, node);
-        }
-    }
-    async onClick(evt) {
-        const target = evt.target;
-        if (!(target instanceof HTMLInputElement) || !target.classList.contains("inline-cb"))
-            return;
-        // Only apply aggressive event prevention for reading mode checkboxes
-        const isReadingMode = target.dataset["mode"] === "reading";
-        if (isReadingMode) {
-            evt.preventDefault();
-            evt.stopPropagation();
-        }
-        const filePath = target.dataset["file"];
-        const secStartStr = target.dataset["secStart"];
-        if (!filePath || !secStartStr)
-            return;
-        const matchText = target.dataset["matchText"] || "[ ]";
-        const beforeHint = target.dataset["nodeTextBefore"] ?? "";
-        const afterHint = target.dataset["nodeTextAfter"] ?? "";
-        console.log(`onClick handler called, current checked: ${target.checked}`);
-        console.log(`Target element:`, target);
-        console.log(`Original markdown: "${target.dataset["markdownText"]}"`);
-        console.log(`Match text: "${matchText}"`);
-        console.log(`Expected vs actual: expected=${/[xX]/.test(matchText)}, actual=${target.checked}`);
-        // Determine the new state based on mode
-        let newCheckedState;
-        if (isReadingMode) {
-            // Since we prevented default, manually toggle the checkbox
-            newCheckedState = !target.checked;
-            target.checked = newCheckedState;
-        }
-        else {
-            // For edit mode, use the current state (browser handled the toggle)
-            newCheckedState = target.checked;
-        }
-        console.log(`Processing checkbox change to: ${newCheckedState}`);
-        const file = this.app.vault.getAbstractFileByPath(filePath);
-        if (!(file instanceof obsidian_1.TFile))
-            return;
-        try {
-            // Set flag to prevent re-processing during our update
-            this.isUpdating = true;
-            // Read file and toggle the FIRST occurrence in the section that matches our before/after hints
-            const content = await this.app.vault.read(file);
-            const lines = content.split("\n");
-            const secStart = Number(secStartStr);
-            // Search window: from secStart to secStart+200 lines (reasonable upper bound)
-            const windowEnd = Math.min(lines.length, secStart + 200);
-            let foundLine = -1, foundCh = -1;
-            const needle = (beforeHint + matchText + afterHint).replace(/\r/g, "");
-            // Greedy but practical: scan lines and try to match the central token with surrounding hints
-            for (let ln = secStart; ln < windowEnd && foundLine === -1; ln++) {
-                const line = lines[ln];
-                // Find all occurrences of matchText on this line
-                for (let idx = line.indexOf(matchText); idx !== -1; idx = line.indexOf(matchText, idx + 1)) {
-                    const left = line.slice(Math.max(0, idx - beforeHint.length), idx);
-                    const right = line.slice(idx + matchText.length, idx + matchText.length + afterHint.length);
-                    if (left === beforeHint.slice(-left.length) && right === afterHint.slice(0, right.length)) {
-                        foundLine = ln;
-                        foundCh = idx;
-                        break;
-                    }
-                }
-            }
-            if (foundLine === -1) {
-                // Couldn’t resolve exact position; fall back to toggling the visual element only
-                target.checked = !target.checked;
-                return;
-            }
-            const current = lines[foundLine].slice(foundCh, foundCh + 3);
-            const next = target.checked ? "[ ]" : "[x]"; // invert because we prevented default earlier
-            lines[foundLine] = lines[foundLine].slice(0, foundCh) + next + lines[foundLine].slice(foundCh + 3);
-            await this.app.vault.modify(file, lines.join("\n"));
-            // After write, flip the checkbox visually to match file
-        }
-        catch (error) {
-            console.error("Error updating checkbox:", error);
-            target.checked = !newCheckedState;
-        }
-        finally {
-            // Reset the flag after a brief delay to prevent post-processor interference
-            setTimeout(() => {
-                this.isUpdating = false;
-            }, 50);
-        }
-    }
 }
-exports.default = InlineCheckboxPlugin;
+exports.default = InteractiveCheckboxPlugin;
