@@ -9,6 +9,7 @@ declare module 'obsidian' {
     onunload(): void | Promise<void>;
     registerMarkdownPostProcessor(cb: (el: HTMLElement, ctx: MarkdownPostProcessorContext) => void): void;
     registerDomEvent(el: Document | HTMLElement, type: string, cb: (evt: Event) => void): void;
+    registerEvent(eventRef: any): void;
     app: App;
   }
   export class Notice {
@@ -25,10 +26,13 @@ declare module 'obsidian' {
   }
   export class Workspace {
     getActiveViewOfType<T>(type: any): T | null;
+    getActiveViewOfType(type: typeof MarkdownView): MarkdownView | null;
+    on(event: string, callback: () => void): any;
   }
   export class TFile {}
   export class MarkdownView {
     previewMode: { rerender(force: boolean): void };
+    getMode(): string; // Returns 'source' or 'preview' or 'live'
   }
   export interface MarkdownPostProcessorContext {
     sourcePath: string;

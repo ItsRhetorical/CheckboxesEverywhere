@@ -76,6 +76,8 @@ const INLINE_CB = /\[ \]|\[[xX]\]/g;
 
 export default class InlineCheckboxPlugin extends Plugin {
   private isUpdating = false; // Flag to prevent re-rendering during updates
+  private lastSourceMode: boolean | undefined = undefined; // Track mode changes
+  private mutationObserver: MutationObserver | null = null;
   
   async onload() {
     this.registerMarkdownPostProcessor((el, ctx) => this.process(el, ctx));
@@ -88,6 +90,9 @@ export default class InlineCheckboxPlugin extends Plugin {
       // Obsidian v0.13+ CodeMirror 6
       // @ts-ignore
       this.registerEditorExtension(this.inlineCheckboxCM6());
+      
+      // Start observing for mode changes
+      this.startModeObserver();
     } else {
       // Obsidian v0.12 CodeMirror 5
       // @ts-ignore
@@ -96,6 +101,74 @@ export default class InlineCheckboxPlugin extends Plugin {
           // Not implemented: CM5 support (Obsidian 0.12 is legacy)
         });
       });
+    }
+  }
+  
+  onunload() {
+    if (this.mutationObserver) {
+      this.mutationObserver.disconnect();
+      this.mutationObserver = null;
+    }
+  }
+  
+  private startModeObserver() {
+    // Observe changes to the workspace that might indicate mode switches
+    this.mutationObserver = new MutationObserver((mutations) => {
+      for (const mutation of mutations) {
+        // Check if any class changes might indicate a mode switch
+        if (mutation.type === 'attributes' && mutation.attributeName === 'class') {
+          this.checkModeChange();
+        }
+        // Also check for child list changes that might affect the editor
+        else if (mutation.type === 'childList' && mutation.target) {
+          const target = mutation.target as Element;
+          if (target.classList?.contains('workspace-leaf') || 
+              target.closest('.workspace-leaf')) {
+            this.checkModeChange();
+          }
+        }
+      }
+    });
+    
+    // Observe the workspace for changes
+    const workspace = document.querySelector('.workspace');
+    if (workspace) {
+      this.mutationObserver.observe(workspace, {
+        attributes: true,
+        attributeFilter: ['class', 'data-mode'],
+        childList: true,
+        subtree: true
+      });
+    }
+  }
+  
+  private checkModeChange() {
+    // Debounce the check to avoid excessive calls
+    setTimeout(() => {
+      const activeView = this.app.workspace.getActiveViewOfType(MarkdownView) as MarkdownView;
+      if (activeView && (activeView as any).currentMode) {
+        const currentSourceMode = (activeView as any).currentMode.sourceMode;
+        
+        if (currentSourceMode !== this.lastSourceMode) {
+          console.log(`Mode changed from ${this.lastSourceMode} to ${currentSourceMode}`);
+          this.lastSourceMode = currentSourceMode;
+          this.triggerEditorUpdate();
+        }
+      }
+    }, 50); // Small delay to ensure DOM is stable
+  }
+  
+  private triggerEditorUpdate() {
+    // Force CodeMirror to update decorations by triggering a state update
+    const activeView = this.app.workspace.getActiveViewOfType(MarkdownView) as MarkdownView;
+    if (activeView && (activeView as any).editor) {
+      const editor = (activeView as any).editor;
+      if (editor.cm && editor.cm.dispatch) {
+        // Trigger a minimal state update to refresh decorations
+        setTimeout(() => {
+          editor.cm.dispatch({ effects: [] });
+        }, 10);
+      }
     }
   }
   // CodeMirror 6 extension for inline checkboxes in edit mode
@@ -165,6 +238,27 @@ export default class InlineCheckboxPlugin extends Plugin {
       const { EditorView, Decoration, WidgetType } = require('@codemirror/view');
       // @ts-ignore
       const { StateField, RangeSetBuilder } = require('@codemirror/state');
+      
+      // Check if we're in source mode using Obsidian's API
+      // Use currentMode.sourceMode to detect the actual view mode state
+      const activeView = this.app.workspace.getActiveViewOfType(MarkdownView) as MarkdownView;
+      if (activeView && (activeView as any).currentMode) {
+        const currentMode = (activeView as any).currentMode;
+        const sourceMode = currentMode.sourceMode;
+        
+        console.log(`currentMode.sourceMode: ${sourceMode}`);
+        
+        if (sourceMode === true) {
+          console.log("Source editing mode detected, skipping checkbox decorations");
+          return new RangeSetBuilder().finish();
+        } else if (sourceMode === false) {
+          console.log("Live preview editing mode detected, applying checkbox decorations");
+        } else {
+          console.log("Reading mode detected (sourceMode undefined), applying checkbox decorations");
+        }
+      } else {
+        console.log("Could not access currentMode, applying decorations");
+      }
       
       const builder = new RangeSetBuilder();
       const text = state.doc.toString();
