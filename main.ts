@@ -3,6 +3,7 @@ import { Plugin, MarkdownPostProcessorContext, MarkdownView } from 'obsidian';
 export default class InteractiveCheckboxPlugin extends Plugin {
 	private checkboxProcessor!: (element: HTMLElement, context: MarkdownPostProcessorContext) => void;
 	private livePreviewExtensions: any[] = [];
+	private styleElement: HTMLStyleElement | null = null;
 
 	async onload() {
 		console.log('Loading Interactive Checkbox Plugin');
@@ -23,9 +24,15 @@ export default class InteractiveCheckboxPlugin extends Plugin {
 
 	onunload() {
 		console.log('Unloading Interactive Checkbox Plugin');
-	}
-
-	private processReadingMode(element: HTMLElement, context: MarkdownPostProcessorContext) {
+		
+		// Remove custom styles
+		if (this.styleElement && this.styleElement.parentNode) {
+			this.styleElement.parentNode.removeChild(this.styleElement);
+			this.styleElement = null;
+		}
+	}	
+  
+  private processReadingMode(element: HTMLElement, context: MarkdownPostProcessorContext) {
 		// Find all text nodes that contain checkbox patterns
 		const walker = document.createTreeWalker(
 			element,
@@ -125,7 +132,7 @@ export default class InteractiveCheckboxPlugin extends Plugin {
 			}
 
 			checkbox.addEventListener('click', async (e) => {
-				await this.handleCheckboxToggle(checkbox, context);
+				await this.handleReadingModeCheckboxToggle(checkbox, context);
 			});
 
 			elements.push(checkbox);
@@ -150,13 +157,11 @@ export default class InteractiveCheckboxPlugin extends Plugin {
 		});
 	}
 
-	private async handleCheckboxToggle(checkbox: HTMLInputElement, context: MarkdownPostProcessorContext) {
+	private async handleReadingModeCheckboxToggle(checkbox: HTMLInputElement, context: MarkdownPostProcessorContext) {
 		const newState = checkbox.checked;
 		
 		const activeView = this.app.workspace.getActiveViewOfType(MarkdownView) as MarkdownView | null;
-		if (activeView && activeView.file && activeView.file.path === context.sourcePath) {
-
-      const editor = activeView.editor;
+		if (activeView) {
 			const absoluteLineIndex = parseInt(checkbox.dataset.absoluteLineIndex || '');
 			const relativeIndex = parseInt(checkbox.dataset.relativeIndex || '');
 			const originalPattern = checkbox.dataset.originalPattern;
@@ -168,6 +173,7 @@ export default class InteractiveCheckboxPlugin extends Plugin {
 				const to = { line: absoluteLineIndex, ch: relativeIndex + originalPattern.length };
 				
 				try {
+					const editor = activeView.editor;
 					editor.replaceRange(newPattern, from, to);
 				} catch (error) {
 					console.error('Editor API failed:', error);
@@ -372,7 +378,6 @@ export default class InteractiveCheckboxPlugin extends Plugin {
 					continue;
 				}
 				
-				console.log(`Adding checkbox decoration: "${match[0]}" at ${from}-${to}`);
 				builder.add(from, to, Decoration.replace({
 					widget: new CheckboxWidget(isChecked, from, to)
 				}));
@@ -387,8 +392,8 @@ export default class InteractiveCheckboxPlugin extends Plugin {
 
 	private addStyles() {
 		// Add CSS for checkbox styling
-		const style = document.createElement('style');
-		style.textContent = `
+		this.styleElement = document.createElement('style');
+		this.styleElement.textContent = `
 			.inline-cb {
 				cursor: pointer;
 				margin: 0 2px;
@@ -401,6 +406,6 @@ export default class InteractiveCheckboxPlugin extends Plugin {
 				vertical-align: middle;
 			}
 		`;
-		document.head.appendChild(style);
+		document.head.appendChild(this.styleElement);
 	}
 }

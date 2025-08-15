@@ -5,6 +5,7 @@ class InteractiveCheckboxPlugin extends obsidian_1.Plugin {
     constructor() {
         super(...arguments);
         this.livePreviewExtensions = [];
+        this.styleElement = null;
     }
     async onload() {
         console.log('Loading Interactive Checkbox Plugin');
@@ -16,11 +17,15 @@ class InteractiveCheckboxPlugin extends obsidian_1.Plugin {
         this.registerMarkdownPostProcessor(this.checkboxProcessor);
         // Set up CodeMirror extensions for live preview mode
         this.setupLivePreviewMode();
-        // Add CSS styles
         this.addStyles();
     }
     onunload() {
         console.log('Unloading Interactive Checkbox Plugin');
+        // Remove custom styles
+        if (this.styleElement && this.styleElement.parentNode) {
+            this.styleElement.parentNode.removeChild(this.styleElement);
+            this.styleElement = null;
+        }
     }
     processReadingMode(element, context) {
         // Find all text nodes that contain checkbox patterns
@@ -65,8 +70,6 @@ class InteractiveCheckboxPlugin extends obsidian_1.Plugin {
                 isChecked
             });
         }
-        // Process replacements in reverse order to maintain indices
-        // but only if we found any replacements
         if (replacements.length > 0) {
             this.replaceAllCheckboxesInTextNode(textNode, replacements.reverse(), context);
         }
@@ -78,52 +81,40 @@ class InteractiveCheckboxPlugin extends obsidian_1.Plugin {
         const originalText = textNode.textContent || '';
         const parent = textNode.parentNode;
         const nextSibling = textNode.nextSibling;
-        // Build the replacement elements in order
         const elements = [];
         let lastIndex = 0;
-        // Process replacements in forward order (they should already be sorted in reverse)
         replacements.reverse().forEach(replacement => {
             const { index, length, isChecked } = replacement;
-            // Add text before this checkbox
             if (index > lastIndex) {
                 const textBefore = originalText.substring(lastIndex, index);
                 if (textBefore) {
                     elements.push(document.createTextNode(textBefore));
                 }
             }
-            // Create the checkbox element
             const checkbox = document.createElement('input');
             checkbox.type = 'checkbox';
             checkbox.checked = isChecked;
             checkbox.className = 'inline-cb';
-            // Calculate absolute position in the file
             const sectionInfo = context.getSectionInfo(parent);
             if (sectionInfo) {
-                // Get the start position of this section in the file
                 const sectionStart = sectionInfo.lineStart;
-                // Store absolute position data for precise file updating
                 checkbox.dataset.absoluteLineIndex = sectionStart.toString();
                 checkbox.dataset.relativeIndex = index.toString();
                 checkbox.dataset.originalPattern = originalText.substring(index, index + length);
             }
-            // Add click handler
             checkbox.addEventListener('click', async (e) => {
-                // Let the checkbox state change naturally, then handle the file update
-                await this.handleCheckboxToggle(checkbox, context);
+                await this.handleReadingModeCheckboxToggle(checkbox, context);
             });
             elements.push(checkbox);
             lastIndex = index + length;
         });
-        // Add remaining text after the last checkbox
         if (lastIndex < originalText.length) {
             const remainingText = originalText.substring(lastIndex);
             if (remainingText) {
                 elements.push(document.createTextNode(remainingText));
             }
         }
-        // Remove the original text node
         parent.removeChild(textNode);
-        // Insert all new elements
         elements.forEach(element => {
             if (nextSibling) {
                 parent.insertBefore(element, nextSibling);
@@ -133,24 +124,20 @@ class InteractiveCheckboxPlugin extends obsidian_1.Plugin {
             }
         });
     }
-    async handleCheckboxToggle(checkbox, context) {
+    async handleReadingModeCheckboxToggle(checkbox, context) {
         const newState = checkbox.checked;
-        // Try to use the safer Editor API first
         const activeView = this.app.workspace.getActiveViewOfType(obsidian_1.MarkdownView);
-        if (activeView && activeView.file && activeView.file.path === context.sourcePath) {
-            // We can use the editor API for safer modification
-            const editor = activeView.editor;
+        if (activeView) {
             const absoluteLineIndex = parseInt(checkbox.dataset.absoluteLineIndex || '');
             const relativeIndex = parseInt(checkbox.dataset.relativeIndex || '');
             const originalPattern = checkbox.dataset.originalPattern;
             if (!isNaN(absoluteLineIndex) && !isNaN(relativeIndex) && originalPattern) {
                 const newPattern = newState ? '[x]' : '[ ]';
-                // Use Editor.replaceRange for precise replacement
                 const from = { line: absoluteLineIndex, ch: relativeIndex };
                 const to = { line: absoluteLineIndex, ch: relativeIndex + originalPattern.length };
                 try {
+                    const editor = activeView.editor;
                     editor.replaceRange(newPattern, from, to);
-                    return; // Successfully updated using Editor API
                 }
                 catch (error) {
                     console.error('Editor API failed:', error);
@@ -188,7 +175,6 @@ class InteractiveCheckboxPlugin extends obsidian_1.Plugin {
         const viewState = activeLeaf.getViewState();
         if (!viewState || viewState.type !== 'markdown')
             return null;
-        // Check the view state for mode information according to API docs
         if (viewState.state?.mode === 'preview') {
             return 'reading';
         }
@@ -324,7 +310,6 @@ class InteractiveCheckboxPlugin extends obsidian_1.Plugin {
                 if (isInCodeBlock(from)) {
                     continue;
                 }
-                console.log(`Adding checkbox decoration: "${match[0]}" at ${from}-${to}`);
                 builder.add(from, to, Decoration.replace({
                     widget: new CheckboxWidget(isChecked, from, to)
                 }));
@@ -338,8 +323,8 @@ class InteractiveCheckboxPlugin extends obsidian_1.Plugin {
     }
     addStyles() {
         // Add CSS for checkbox styling
-        const style = document.createElement('style');
-        style.textContent = `
+        this.styleElement = document.createElement('style');
+        this.styleElement.textContent = `
 			.inline-cb {
 				cursor: pointer;
 				margin: 0 2px;
@@ -352,7 +337,7 @@ class InteractiveCheckboxPlugin extends obsidian_1.Plugin {
 				vertical-align: middle;
 			}
 		`;
-        document.head.appendChild(style);
+        document.head.appendChild(this.styleElement);
     }
 }
 exports.default = InteractiveCheckboxPlugin;
