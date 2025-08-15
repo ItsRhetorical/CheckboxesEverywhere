@@ -96,10 +96,20 @@ class InteractiveCheckboxPlugin extends obsidian_1.Plugin {
             checkbox.type = 'checkbox';
             checkbox.checked = isChecked;
             checkbox.className = 'inline-cb';
+            // Calculate absolute position in the file
+            const sectionInfo = context.getSectionInfo(parent);
+            if (sectionInfo) {
+                // Get the start position of this section in the file
+                const sectionStart = sectionInfo.lineStart;
+                // Store absolute position data for precise file updating
+                checkbox.dataset.absoluteLineIndex = sectionStart.toString();
+                checkbox.dataset.relativeIndex = index.toString();
+                checkbox.dataset.originalPattern = originalText.substring(index, index + length);
+            }
             // Add click handler
-            checkbox.addEventListener('click', (e) => {
-                e.preventDefault();
-                this.handleCheckboxToggle(checkbox, context);
+            checkbox.addEventListener('click', async (e) => {
+                // Let the checkbox state change naturally, then handle the file update
+                await this.handleCheckboxToggle(checkbox, context);
             });
             elements.push(checkbox);
             lastIndex = index + length;
@@ -123,68 +133,29 @@ class InteractiveCheckboxPlugin extends obsidian_1.Plugin {
             }
         });
     }
-    replaceCheckboxInTextNode(textNode, replacement, context) {
-        const { index, length, isChecked } = replacement;
-        // Check if textNode is still in the DOM (previous replacements might have removed it)
-        if (!textNode.parentNode) {
-            return;
-        }
-        // Get the current text content (might have changed from previous replacements)
-        const currentText = textNode.textContent || '';
-        if (index >= currentText.length) {
-            return; // Index is beyond current text length
-        }
-        // Create the checkbox element
-        const checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.checked = isChecked;
-        checkbox.className = 'inline-cb';
-        // Add click handler
-        checkbox.addEventListener('click', (e) => {
-            e.preventDefault();
-            this.handleCheckboxToggle(checkbox, context);
-        });
-        // Split the text node and insert the checkbox
-        const beforeText = currentText.substring(0, index);
-        const afterText = currentText.substring(index + length);
-        // Create new text nodes
-        const beforeNode = document.createTextNode(beforeText);
-        const afterNode = document.createTextNode(afterText);
-        // Insert the new nodes
-        textNode.parentNode.insertBefore(beforeNode, textNode);
-        textNode.parentNode.insertBefore(checkbox, textNode);
-        textNode.parentNode.insertBefore(afterNode, textNode);
-        // Remove the original text node
-        textNode.parentNode.removeChild(textNode);
-    }
     async handleCheckboxToggle(checkbox, context) {
         const newState = checkbox.checked;
-        const file = this.app.vault.getAbstractFileByPath(context.sourcePath);
-        if (!file || file.path !== context.sourcePath) {
-            console.warn('File not found for checkbox toggle');
-            return;
-        }
-        try {
-            const content = await this.app.vault.read(file);
-            const lines = content.split('\n');
-            // Find and update the checkbox in the file content
-            const sectionInfo = context.getSectionInfo(checkbox);
-            if (sectionInfo) {
-                const lineIndex = sectionInfo.lineStart;
-                if (lineIndex < lines.length) {
-                    const line = lines[lineIndex];
-                    const newPattern = newState ? '[x]' : '[ ]';
-                    const updatedLine = line.replace(/\[[ xX]\]/, newPattern);
-                    lines[lineIndex] = updatedLine;
-                    const newContent = lines.join('\n');
-                    await this.app.vault.modify(file, newContent);
+        // Try to use the safer Editor API first
+        const activeView = this.app.workspace.getActiveViewOfType(obsidian_1.MarkdownView);
+        if (activeView && activeView.file && activeView.file.path === context.sourcePath) {
+            // We can use the editor API for safer modification
+            const editor = activeView.editor;
+            const absoluteLineIndex = parseInt(checkbox.dataset.absoluteLineIndex || '');
+            const relativeIndex = parseInt(checkbox.dataset.relativeIndex || '');
+            const originalPattern = checkbox.dataset.originalPattern;
+            if (!isNaN(absoluteLineIndex) && !isNaN(relativeIndex) && originalPattern) {
+                const newPattern = newState ? '[x]' : '[ ]';
+                // Use Editor.replaceRange for precise replacement
+                const from = { line: absoluteLineIndex, ch: relativeIndex };
+                const to = { line: absoluteLineIndex, ch: relativeIndex + originalPattern.length };
+                try {
+                    editor.replaceRange(newPattern, from, to);
+                    return; // Successfully updated using Editor API
+                }
+                catch (error) {
+                    console.error('Editor API failed:', error);
                 }
             }
-        }
-        catch (error) {
-            console.error('Error updating checkbox state:', error);
-            // Revert checkbox state on error
-            checkbox.checked = !newState;
         }
     }
     isInCodeBlock(node) {
