@@ -46,7 +46,7 @@ Text before [ ] checkbox after text
 ```
 
 
-![Example](https://github.com/ItsRhetorical/CheckboxesEverywhere/blob/main/ReadmeScreenshot.jpg?raw=true)
+![Example](https://github.com/ItsRhetorical/CheckboxesEverywhere/blob/main/ReadmeScreenshot.png?raw=true)
 
 ## 📄 License
 
