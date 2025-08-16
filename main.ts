@@ -19,17 +19,10 @@ export default class CheckboxEverywherePlugin extends Plugin {
 		// Set up CodeMirror extensions for live preview mode
 		this.setupLivePreviewMode();
 
-		this.addStyles();
 	}
 
 	onunload() {
 		console.log('Unloading Checkboxes Everywhere Plugin');
-		
-		// Remove custom styles
-		if (this.styleElement && this.styleElement.parentNode) {
-			this.styleElement.parentNode.removeChild(this.styleElement);
-			this.styleElement = null;
-		}
 	}	
   
   private processReadingMode(element: HTMLElement, context: MarkdownPostProcessorContext) {
@@ -390,22 +383,4 @@ export default class CheckboxEverywherePlugin extends Plugin {
 		}
 	}
 
-	private addStyles() {
-		// Add CSS for checkbox styling
-		this.styleElement = document.createElement('style');
-		this.styleElement.textContent = `
-			.inline-cb {
-				cursor: pointer;
-				margin: 0 2px;
-				vertical-align: middle;
-			}
-			
-			.cm-inline-cb {
-				cursor: pointer;
-				margin: 0 2px;
-				vertical-align: middle;
-			}
-		`;
-		document.head.appendChild(this.styleElement);
-	}
 }

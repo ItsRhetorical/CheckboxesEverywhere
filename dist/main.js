@@ -1,14 +1,14 @@
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
 const obsidian_1 = require("obsidian");
-class InteractiveCheckboxPlugin extends obsidian_1.Plugin {
+class CheckboxEverywherePlugin extends obsidian_1.Plugin {
     constructor() {
         super(...arguments);
         this.livePreviewExtensions = [];
         this.styleElement = null;
     }
     async onload() {
-        console.log('Loading Interactive Checkbox Plugin');
+        console.log('Loading Checkbox Everywhere Plugin');
         // Create the checkbox processor function for reading mode
         this.checkboxProcessor = (element, context) => {
             this.processReadingMode(element, context);
@@ -17,15 +17,9 @@ class InteractiveCheckboxPlugin extends obsidian_1.Plugin {
         this.registerMarkdownPostProcessor(this.checkboxProcessor);
         // Set up CodeMirror extensions for live preview mode
         this.setupLivePreviewMode();
-        this.addStyles();
     }
     onunload() {
-        console.log('Unloading Interactive Checkbox Plugin');
-        // Remove custom styles
-        if (this.styleElement && this.styleElement.parentNode) {
-            this.styleElement.parentNode.removeChild(this.styleElement);
-            this.styleElement = null;
-        }
+        console.log('Unloading Checkboxes Everywhere Plugin');
     }
     processReadingMode(element, context) {
         // Find all text nodes that contain checkbox patterns
@@ -321,23 +315,5 @@ class InteractiveCheckboxPlugin extends obsidian_1.Plugin {
             return null;
         }
     }
-    addStyles() {
-        // Add CSS for checkbox styling
-        this.styleElement = document.createElement('style');
-        this.styleElement.textContent = `
-			.inline-cb {
-				cursor: pointer;
-				margin: 0 2px;
-				vertical-align: middle;
-			}
-			
-			.cm-inline-cb {
-				cursor: pointer;
-				margin: 0 2px;
-				vertical-align: middle;
-			}
-		`;
-        document.head.appendChild(this.styleElement);
-    }
 }
-exports.default = InteractiveCheckboxPlugin;
+exports.default = CheckboxEverywherePlugin;
