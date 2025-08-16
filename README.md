@@ -1,18 +1,19 @@
-# Interactive Checkbox Plugin
+# Checkbox Everywhere Plugin
 
 Transform your markdown checkboxes into interactive, clickable elements across all Obsidian view modes. This plugin converts `[ ]` and `[x]` syntax into HTML checkboxes that persist their state when clicked.
+
 ## Installation
 
 ### Manual Installation
 1. Download the latest release files
-2. Create a folder: `YourVault/.obsidian/plugins/interactive-checkbox-plugin/`
+2. Create a folder: `YourVault/.obsidian/plugins/checkboxes-everywhere/`
 3. Copy the files to this folder
 4. Enable the plugin in Obsidian Settings → Community Plugins
 
 ### Building from Source
 ```bash
-git clone https://github.com/your-username/obsidian-interactive-checkbox-plugin.git
-cd obsidian-interactive-checkbox-plugin
+git clone https://github.com/ItsRhetorical/CheckboxesEverywhere.git
+cd CheckboxesEverywhere
 npm install
 npm run build
 ```
@@ -21,8 +22,8 @@ npm run build
 
 Simply write checkboxes in your markdown using the standard syntax:
 
- `[ ]` - Creates an unchecked interactive checkbox
- `[x]` or `[X]` - Creates a checked interactive checkbox
+ `[ ]` - Creates an unchecked checkbox
+ `[x]` or `[X]` - Creates a checked checkbox
 ### Example Patterns
 
 The plugin handles various checkbox patterns:

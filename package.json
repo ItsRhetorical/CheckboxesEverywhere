@@ -1,12 +1,21 @@
 {
-  "name": "checkbox-plugin",
-  "version": "0.0.1",
-  "description": "A sample Obsidian plugin scaffolded by Copilot.",
+  "name": "checkboxes-everywhere",
+  "version": "0.1.0",
+  "description": "Transform markdown checkboxes into interactive elements that persist state when clicked.",
   "main": "main.ts",
+  "type": "module",
+  "license": "MIT",
   "scripts": {
-    "build": "tsc"
+    "build": "tsc",
+    "lint": "eslint main.ts --ext .ts",
+    "lint:fix": "eslint main.ts --ext .ts --fix"
   },
   "devDependencies": {
-    "typescript": "^5.0.0"
+    "@eslint/js": "^9.33.0",
+    "@typescript-eslint/eslint-plugin": "^8.39.1",
+    "@typescript-eslint/parser": "^8.39.1",
+    "eslint": "^9.33.0",
+    "typescript": "^5.0.0",
+    "typescript-eslint": "^8.39.1"
   }
 }

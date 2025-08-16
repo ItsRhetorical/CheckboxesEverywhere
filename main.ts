@@ -1,12 +1,12 @@
 import { Plugin, MarkdownPostProcessorContext, MarkdownView } from 'obsidian';
 
-export default class InteractiveCheckboxPlugin extends Plugin {
+export default class CheckboxEverywherePlugin extends Plugin {
 	private checkboxProcessor!: (element: HTMLElement, context: MarkdownPostProcessorContext) => void;
 	private livePreviewExtensions: any[] = [];
 	private styleElement: HTMLStyleElement | null = null;
 
 	async onload() {
-		console.log('Loading Interactive Checkbox Plugin');
+		console.log('Loading Checkbox Everywhere Plugin');
 
 		// Create the checkbox processor function for reading mode
 		this.checkboxProcessor = (element: HTMLElement, context: MarkdownPostProcessorContext) => {
@@ -23,7 +23,7 @@ export default class InteractiveCheckboxPlugin extends Plugin {
 	}
 
 	onunload() {
-		console.log('Unloading Interactive Checkbox Plugin');
+		console.log('Unloading Checkboxes Everywhere Plugin');
 		
 		// Remove custom styles
 		if (this.styleElement && this.styleElement.parentNode) {
