@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "minAppVersion": "0.12.0",
   "description": "Transform markdown checkboxes into interactive elements that persist state when clicked.",
-  "author": "Copilot",
-  "authorUrl": "",
+  "author": "ItsRhetorical",
+  "authorUrl": "https://github.com/ItsRhetorical/",
   "isDesktopOnly": false
 }

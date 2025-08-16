@@ -46,7 +46,7 @@ Text before [ ] checkbox after text
 ```
 
 
-![[Pasted image 20250814114916.png]]
+![Example](https://github.com/ItsRhetorical/CheckboxesEverywhere/blob/main/ReasmeScreenshot.jpg?raw=true)
 
 ## 📄 License
 
